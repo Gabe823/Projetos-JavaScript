@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CollabTask - Gestão Colaborativa</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f4f6f9;
+      color: #333;
+    }
+    .header {
+      background: #2c3e50;
+      color: white;
+      padding: 1.5rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .header h1 { font-size: 1.8rem; }
+    
+    .container {
+      display: flex;
+      height: calc(100vh - 70px);
+    }
+    
+    .sidebar {
+      width: 250px;
+      background: white;
+      border-right: 1px solid #ddd;
+      padding: 20px;
+    }
+    
+    .main {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+    }
+    
+    .kanban {
+      display: flex;
+      gap: 20px;
+      overflow-x: auto;
+      padding: 10px;
+    }
+    
+    .column {
+      background: #f8f9fa;
+      border-radius: 12px;
+      width: 320px;
+      min-height: 600px;
+      padding: 15px;
+    }
+    
+    .column h2 {
+      text-align: center;
+      margin-bottom: 15px;
+      padding: 10px;
+      border-radius: 8px;
+    }
+    
+    .todo { background: #fff3cd; }
+    .doing { background: #cce5ff; }
+    .done { background: #d4edda; }
+    
+    .task {
+      background: white;
+      padding: 15px;
+      margin-bottom: 12px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      cursor: move;
+    }
+    
+    .task-priority {
+      font-size: 0.8rem;
+      padding: 2px 8px;
+      border-radius: 20px;
+      display: inline-block;
+      margin-bottom: 8px;
+    }
+    
+    .add-btn {
+      width: 100%;
+      padding: 12px;
+      background: #3498db;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    
+    .modal-content {
+      background: white;
+      padding: 25px;
+      border-radius: 12px;
+      width: 90%;
+      max-width: 500px;
+    }
+    
+    input, select, textarea {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+    
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>CollabTask</h1>
+    <div>
+      <strong>Equipe:</strong> Gabriel, Ana, Lucas, Maria
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <h3>Projetos</h3>
+      <p><strong>→ Marketing Campaign 2026</strong></p>
+      <hr>
+      <h3>Membros</h3>
+      <ul style="list-style: none;">
+        <li>👤 Gabriel (Você)</li>
+        <li>👤 Ana Silva</li>
+        <li>👤 Lucas Mendes</li>
+        <li>👤 Maria Oliveira</li>
+      </ul>
+      <br>
+      <button class="add-btn" onclick="novaTarefa()">+ Nova Tarefa</button>
+    </div>
+
+    <!-- Kanban Board -->
+    <div class="main">
+      <div class="kanban" id="kanban">
+        <!-- Colunas serão geradas pelo JavaScript -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal" id="modal">
+    <div class="modal-content">
+      <h2 id="modalTitle">Nova Tarefa</h2>
+      <input type="text" id="taskTitle" placeholder="Título da tarefa" required>
+      <textarea id="taskDesc" rows="3" placeholder="Descrição"></textarea>
+      
+      <select id="taskAssignee">
+        <option value="Gabriel">Gabriel (Você)</option>
+        <option value="Ana Silva">Ana Silva</option>
+        <option value="Lucas Mendes">Lucas Mendes</option>
+        <option value="Maria Oliveira">Maria Oliveira</option>
+      </select>
+      
+      <select id="taskPriority">
+        <option value="Alta">Alta Prioridade</option>
+        <option value="Média" selected>Média Prioridade</option>
+        <option value="Baixa">Baixa Prioridade</option>
+      </select>
+      
+      <input type="date" id="taskDue">
+      
+      <div style="margin-top: 15px; text-align: right;">
+        <button onclick="fecharModal()" style="background:#e74c3c; color:white;">Cancelar</button>
+        <button onclick="salvarTarefa()" style="background:#27ae60; color:white;" id="saveBtn">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let tasks = JSON.parse(localStorage.getItem('collabTasks')) || [];
+
+    const columns = [
+      { id: "todo", title: "A Fazer", color: "#f39c12" },
+      { id: "doing", title: "Em Andamento", color: "#3498db" },
+      { id: "done", title: "Concluído", color: "#2ecc71" }
+    ];
+
+    function saveToLocalStorage() {
+      localStorage.setItem('collabTasks', JSON.stringify(tasks));
+    }
+
+    function renderKanban() {
+      const kanban = document.getElementById('kanban');
+      kanban.innerHTML = '';
+
+      columns.forEach(col => {
+        const columnTasks = tasks.filter(t => t.status === col.id);
+
+        let html = `
+          <div class="column ${col.id}">
+            <h2 style="background:${col.color}; color:white;">${col.title} (${columnTasks.length})</h2>
+        `;
+
+        columnTasks.forEach((task, index) => {
+          const globalIndex = tasks.indexOf(task);
+          html += `
+            <div class="task" draggable="true" ondragstart="dragStart(${globalIndex})">
+              <span class="task-priority" style="background:${task.priority === 'Alta' ? '#e74c3c' : task.priority === 'Média' ? '#f1c40f' : '#95a5a6'}">
+                ${task.priority}
+              </span>
+              <strong>${task.title}</strong>
+              <p style="font-size:0.9rem; color:#555; margin:8px 0;">${task.description || ''}</p>
+              <small>👤 ${task.assignee} | 📅 ${task.due || 'Sem prazo'}</small>
+            </div>
+          `;
+        });
+
+        html += `<button class="add-btn" onclick="novaTarefa('${col.id}')">+ Adicionar</button></div>`;
+        kanban.innerHTML += html;
+      });
+    }
+
+    let draggedIndex = null;
+
+    function dragStart(index) {
+      draggedIndex = index;
+    }
+
+    // Permitir drop
+    document.addEventListener('dragover', e => e.preventDefault());
+
+    document.addEventListener('drop', e => {
+      e.preventDefault();
+      const column = e.target.closest('.column');
+      if (column && draggedIndex !== null) {
+        const newStatus = column.classList.contains('todo') ? 'todo' :
+                         column.classList.contains('doing') ? 'doing' : 'done';
+        
+        tasks[draggedIndex].status = newStatus;
+        saveToLocalStorage();
+        renderKanban();
+      }
+    });
+
+    function novaTarefa(status = 'todo') {
+      document.getElementById('modal').style.display = 'flex';
+      document.getElementById('modalTitle').textContent = 'Nova Tarefa';
+      document.getElementById('saveBtn').onclick = () => salvarTarefa(status);
+      
+      // Limpar campos
+      document.getElementById('taskTitle').value = '';
+      document.getElementById('taskDesc').value = '';
+      document.getElementById('taskDue').value = '';
+    }
+
+    function fecharModal() {
+      document.getElementById('modal').style.display = 'none';
+    }
+
+    function salvarTarefa(defaultStatus = 'todo') {
+      const title = document.getElementById('taskTitle').value.trim();
+      if (!title) {
+        alert("O título é obrigatório!");
+        return;
+      }
+
+      const newTask = {
+        id: Date.now(),
+        title: title,
+        description: document.getElementById('taskDesc').value,
+        assignee: document.getElementById('taskAssignee').value,
+        priority: document.getElementById('taskPriority').value,
+        due: document.getElementById('taskDue').value,
+        status: defaultStatus
+      };
+
+      tasks.push(newTask);
+      saveToLocalStorage();
+      fecharModal();
+      renderKanban();
+    }
+
+    // Inicializar
+    renderKanban();
+  </script>
+</body>
+</html>
